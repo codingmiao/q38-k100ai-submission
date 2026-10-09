@@ -1,0 +1,27 @@
+# ============================================================================
+# 服务端启动日志摘录（q38_tp2，提交配置，2026-09-28 15:45 启动）
+# 完整日志：/modellogs/q38tp2-sglang-0928-1545.log（容器内）
+# 摘录关键行：证明提交配置生效 + GDN 状态池上限
+# ============================================================================
+
+# --- 投机解码 + 并发上限（GDN/mamba 状态池是并发上限，非 KV）---
+[2026-09-28 15:46:24] Max running requests is reset to 48 for speculative decoding. You can override this by explicitly setting --max-running-requests.
+[2026-09-28 15:46:24] Spec v2 is enabled by default for eagle/eagle3/standalone speculative decoding.
+
+# --- 关键资源/并发参数（MRATIO=1.5 抬 GDN 状态池 → max_running_requests=35）---
+[2026-09-28 15:48:14 TP0] max_total_num_tokens=275648, chunked_prefill_size=16384, max_prefill_tokens=16384, max_running_requests=35, context_len=262144, available_gpu_mem=12.86 GB
+
+# --- 服务就绪 ---
+[2026-09-28 15:48:15] INFO:     Uvicorn running on http://0.0.0.0:30011 (Press CTRL+C to quit)
+[2026-09-28 15:49:04] The server is fired up and ready to roll!
+
+# --- 提交配置生效证据（server_args 关键字段，完整见 config/sglang_serve_config.md）---
+#   quantization='w8a8_int8'  dtype='bfloat16'  kv_cache_dtype='auto'
+#   mem_fraction_static=0.8  mamba_full_memory_ratio=1.5  mamba_scheduler_strategy='extra_buffer'
+#   attention_backend='fa3'  mm_attention_backend='fa3'  page_size=64
+#   chunked_prefill_size=16384  cuda_graph_max_bs=64  context_length=262144
+#   speculative_algorithm='EAGLE'  speculative_num_steps=3  speculative_eagle_topk=1  speculative_num_draft_tokens=4
+#   disable_custom_all_reduce=True  keep_mm_feature_on_device=True
+#   tool_call_parser='qwen3_coder'  reasoning_parser='qwen3'
+#   tp_size=2  pp_size=1  port=30011  served_model_name='q38tp2'
+#   （三个代码级杠杆 INT8TUNE/PREFILLTUNE/GDN_TUNE 由容器内 env 门控，见 config/ 与 patch/）

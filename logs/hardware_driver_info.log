@@ -1,0 +1,36 @@
+########## HARDWARE / DRIVER INFO ##########
+captured: Fri Oct 09 08:44:29 CST 2026
+host: sk-ai (ssh -p 20023)
+note: 本文件为提交环境（K100-AI × 8 卡机，本方案用卡 0,1 = TP2）的硬件/驱动实测快照。
+      卡 0,1 = INT8 提交实例 q38_tp2（端口 30011）；卡 2,3 = BF16 对照；卡 4-7 = 生产 chat_min（只读）。
+
+=== hy-smi (System Management Interface) ===
+================================= System Management Interface ==================================
+================================================================================================
+HCU     Temp     AvgPwr     Perf     PwrCap     VRAM%      HCU%      Mode
+0       32.0C    106.0W     auto     400.0W     85%        0.0%      Normal
+1       33.0C    106.0W     auto     400.0W     85%        0.0%      Normal
+2       33.0C     99.0W     auto     400.0W     64%        0.0%      Normal
+3       33.0C    104.0W     auto     400.0W     64%        0.0%      Normal
+4       51.0C    111.0W     auto     400.0W     89%        0.0%      Normal
+5       51.0C    110.0W     auto     400.0W     89%        0.0%      Normal
+6       50.0C    110.0W     auto     400.0W     89%        0.0%      Normal
+7       50.0C    107.0W     auto     400.0W     89%        0.0%      Normal
+================================================================================================
+======================================== End of SMI Log ========================================
+（8 × 海光 K100-AI，gfx928，120 CU，64GB HBM/卡，HBM ~0.73 TB/s copy 实测；本方案用卡 0,1）
+
+=== 驱动 / 运行时栈 ===
+DTK_VERSION=2604
+ROCM_PATH=/opt/dtk
+HIP_PATH=/opt/dtk/hip
+hyhal: /opt/hyhal（bin/bitcode/dkms/firmware/hsa/lib/...）
+torch 2.10.0
+sglang 0.5.12
+python 3.10.12
+
+=== 操作系统 ===
+宿主机: Kylin Linux Advanced Server Industry V10
+        kernel 4.19.90-89.14.3.ind.v2401.ky10.x86_64
+容器:   Ubuntu 22.04.5 LTS (Jammy Jellyfish)
+        镜像 harbor.sourcefind.cn:5443/dcu/admin/base/sglang:0.5.12-ubuntu22.04-dtk2604-py3.10

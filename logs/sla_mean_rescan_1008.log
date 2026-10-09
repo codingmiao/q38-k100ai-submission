@@ -1,0 +1,98 @@
+########## SLA MEAN RE-SCAN START Thu Oct 08 21:49:36 CST 2026 ##########
+BASE=http://127.0.0.1:30011 MODEL=q38tp2
+=== canary_pre (in=4096 c=1) ===
+  harness exit=0
+{
+  "n_tpot": 24,
+  "n_ttft": 24,
+  "rounds": 3,
+  "tpot_mean_ms": 16.00203696680526,
+  "tpot_p95_ms": 18.80607395200377,
+  "ttft_mean_s": 1.2835065721665917,
+  "ttft_p95_s": 1.2903482193510172
+}
+=== 4k_c1 (in=4096 c=1) ===
+  harness exit=0
+{
+  "n_tpot": 24,
+  "n_ttft": 24,
+  "rounds": 3,
+  "tpot_mean_ms": 15.986521042440598,
+  "tpot_p95_ms": 18.841165803324607,
+  "ttft_mean_s": 1.3393412271667937,
+  "ttft_p95_s": 1.3478482516509758
+}
+  SLA: ttft_mean=1.339s (<10.0) tpot_mean=15.99ms (<80.0) -> PASS
+=== 4k_c8 (in=4096 c=8) ===
+  harness exit=0
+{
+  "n_tpot": 48,
+  "n_ttft": 48,
+  "rounds": 3,
+  "tpot_mean_ms": 32.44561767006774,
+  "tpot_p95_ms": 41.7424844165206,
+  "ttft_mean_s": 1.655986090604036,
+  "ttft_p95_s": 3.9268899234992203
+}
+  SLA: ttft_mean=1.656s (<10.0) tpot_mean=32.45ms (<80.0) -> PASS
+=== 4k_c16 (in=4096 c=16) ===
+  harness exit=0
+{
+  "n_tpot": 96,
+  "n_ttft": 96,
+  "rounds": 3,
+  "tpot_mean_ms": 54.06970188137419,
+  "tpot_p95_ms": 75.21340714002999,
+  "ttft_mean_s": 8.334385146916702,
+  "ttft_p95_s": 20.38810407424944
+}
+  SLA: ttft_mean=8.334s (<10.0) tpot_mean=54.07ms (<80.0) -> PASS
+=== 4k_c32 (in=4096 c=32) ===
+  harness exit=0
+{
+  "n_tpot": 192,
+  "n_ttft": 192,
+  "rounds": 3,
+  "tpot_mean_ms": 101.02072753893269,
+  "tpot_p95_ms": 145.54107318220926,
+  "ttft_mean_s": 13.932658667552024,
+  "ttft_p95_s": 40.69696674575043
+}
+  SLA: ttft_mean=13.933s (<10.0) tpot_mean=101.02ms (<80.0) -> FAIL
+=== 64k_c1 (in=65536 c=1) ===
+  harness exit=0
+{
+  "n_tpot": 24,
+  "n_ttft": 24,
+  "rounds": 3,
+  "tpot_mean_ms": 21.014309152573865,
+  "tpot_p95_ms": 25.91989568377229,
+  "ttft_mean_s": 29.01459801824952,
+  "ttft_p95_s": 29.070200892849698
+}
+  SLA: ttft_mean=29.015s (<30.0) tpot_mean=21.01ms (<100.0) -> PASS
+=== 64k_c8 (in=65536 c=8) ===
+  harness exit=0
+{
+  "n_tpot": 48,
+  "n_ttft": 48,
+  "rounds": 3,
+  "tpot_mean_ms": 106.44952584477818,
+  "tpot_p95_ms": 172.50103859902032,
+  "ttft_mean_s": 167.67132875895845,
+  "ttft_p95_s": 261.6563200591994
+}
+  SLA: ttft_mean=167.671s (<30.0) tpot_mean=106.45ms (<100.0) -> FAIL
+=== canary_post (in=4096 c=1) ===
+  harness exit=0
+{
+  "n_tpot": 24,
+  "n_ttft": 24,
+  "rounds": 3,
+  "tpot_mean_ms": 16.4651288575678,
+  "tpot_p95_ms": 19.344655163296277,
+  "ttft_mean_s": 1.2886336614581826,
+  "ttft_p95_s": 1.2988388688994745
+}
+########## SLA MEAN RE-SCAN DONE Thu Oct 08 23:46:29 CST 2026 ##########
+LOG=/work/sla_mean_rescan/scan_1008-2149.log

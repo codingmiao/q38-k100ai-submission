@@ -1,0 +1,19 @@
+# ============================================================================
+# 依赖声明
+#
+# 推理栈（sglang 0.5.12 / lightop / aiter / triton / torch）全部预装在官方镜像内：
+#   harbor.sourcefind.cn:5443/dcu/admin/base/sglang:0.5.12-ubuntu22.04-dtk2604-py3.10
+# 无需额外 pip 安装即可启动模型。
+#
+# 本文件仅声明 Benchmark harness 的运行时依赖（容器内已具备，列出供复现核对）。
+# ============================================================================
+
+# Benchmark harness（scripts/benchmark_official.py）唯一第三方依赖
+requests>=2.28
+
+# 推理框架（镜像内已装，版本锁定，勿升级）
+# sglang==0.5.12
+# lightop   # 海光 INT8 GEMM 栈（SGLANG_USE_LIGHTOP=1）
+# aiter     # 海光 Triton 算子库（GDN 线性注意力 / chunked kernel）
+# triton    # 随 DTK 2604
+# torch     # 随 DTK 2604（gfx928 后端）

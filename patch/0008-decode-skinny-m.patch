@@ -1,0 +1,35 @@
+--- a/srt/layers/quantization/w8a8_int8.py
++++ b/srt/layers/quantization/w8a8_int8.py
+@@ -80,6 +80,12 @@
+                     "GROUP_SIZE_M": 4, "SPLIT_K": 1, "num_stages": 3, "num_warps": 4}
+ _Q38_CFG_SK8 = {"BLOCK_SIZE_M": 32, "BLOCK_SIZE_N": 16, "BLOCK_SIZE_K": 128,
+                 "GROUP_SIZE_M": 4, "SPLIT_K": 8, "num_stages": 2, "num_warps": 4}
++# [q38-opt 0008] skinny-M decode winner (perf/bench_decode_stock_vs_winner.py,
++# 2026-09-29, M=1/2/4/5/8, within-run vs stock heuristic): BM16/BN32/BK256/st4/w4
++# beats stock (st0) 1.07-1.23x on qkvz and ST3 1.18-1.28x on gate_up at M<=8.
++# Applied only to the measured (1,8) bucket; M>=9 keeps prior config (fail-closed).
++_Q38_CFG_BM16BN32ST4 = {"BLOCK_SIZE_M": 16, "BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 256,
++                        "GROUP_SIZE_M": 4, "SPLIT_K": 1, "num_stages": 4, "num_warps": 4}
+ # [q38-opt 0006] prefill-M (M>=129) tuned configs. The stock lightop table uses
+ # num_stages=0 (no software pipelining) for M>128; microbench (perf/bench_prefill_full.py,
+ # 2026-09-28, CUDA-graph timed on K100-AI gfx928) shows num_stages=2 wins 1.14-1.99x on
+@@ -102,7 +108,8 @@
+ # All entries are measured winners only; M ranges where tuned configs lose
+ # (v_proj@M128, q_proj all, small-M down/out_proj) are excluded fail-closed.
+ _Q38_INT8_TABLE = [
+-    ((5120, 17408), [(1, 32, _Q38_CFG_ST3), (33, 64, _Q38_CFG_ST2), (65, 128, _Q38_CFG_BM64),
++    ((5120, 17408), [(1, 8, _Q38_CFG_BM16BN32ST4), (9, 32, _Q38_CFG_ST3),
++                     (33, 64, _Q38_CFG_ST2), (65, 128, _Q38_CFG_BM64),
+                      (129, 4096, _Q38_CFG_P128), (4097, 8192, _Q38_CFG_P128),
+                      (8193, 16384, _Q38_CFG_P64BK128)]),
+     ((8704, 5120), [(33, 96, _Q38_CFG_ST2), (97, 128, _Q38_CFG_BM64),
+@@ -110,7 +117,8 @@
+                     (8193, 16384, _Q38_CFG_P128)]),
+     ((5120, 5120), [(17, 64, _Q38_CFG_ST2), (65, 128, _Q38_CFG_BM64),
+                     (129, 16384, _Q38_CFG_P128)]),
+-    ((5120, 8192), [(65, 96, _Q38_CFG_ST2), (97, 128, _Q38_CFG_BM64),
++    ((5120, 8192), [(1, 8, _Q38_CFG_BM16BN32ST4), (65, 96, _Q38_CFG_ST2),
++                    (97, 128, _Q38_CFG_BM64),
+                     (129, 4096, _Q38_CFG_P256BK64), (4097, 8192, _Q38_CFG_P128),
+                     (8193, 16384, _Q38_CFG_P128)]),
+     ((5120, 48), [(1, 128, _Q38_CFG_SK8)]),

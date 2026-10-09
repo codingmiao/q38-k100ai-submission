@@ -1,0 +1,5 @@
+# Python cruft only — 交付物日志（logs/*.log）必须入库，勿忽略
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store

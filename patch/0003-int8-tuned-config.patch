@@ -1,0 +1,86 @@
+--- a/srt/layers/quantization/w8a8_int8.py
++++ b/srt/layers/quantization/w8a8_int8.py
+@@ -59,6 +59,61 @@
+ 
+ from lightop import gemm_ops as quant_ops
+ 
++# ---------------------------------------------------------------------------
++# [q38-opt 0003] INT8 GEMM tuned-config injection (SGLANG_INT8_TUNE=1)
++# lightop matmul_int8 uses an M-bucket hardcoded config table (num_stages=0,
++# no pipelining). Microbenchmarks (perf/bench_int8_fillm.py, 2026-09-22,
++# CUDA-graph timed on K100-AI gfx928) show BN64 + stages 2/3 wins on the
++# big decode shapes. Table below only contains measured winners; anything
++# unlisted falls back to stock (best_config=None -> heuristic), fail-closed.
++# ---------------------------------------------------------------------------
++import os as _q38_os
++
++_Q38_INT8_TUNE = _q38_os.getenv("SGLANG_INT8_TUNE", "0") == "1"
++_Q38_CFG_ST2 = {"BLOCK_SIZE_M": 32, "BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 256,
++                "GROUP_SIZE_M": 4, "SPLIT_K": 1, "num_stages": 2, "num_warps": 4}
++_Q38_CFG_ST3 = {"BLOCK_SIZE_M": 32, "BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 256,
++                "GROUP_SIZE_M": 4, "SPLIT_K": 1, "num_stages": 3, "num_warps": 4}
++_Q38_CFG_BM64 = {"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 256,
++                 "GROUP_SIZE_M": 4, "SPLIT_K": 1, "num_stages": 2, "num_warps": 4}
++_Q38_CFG_BM16ST3 = {"BLOCK_SIZE_M": 16, "BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 256,
++                    "GROUP_SIZE_M": 4, "SPLIT_K": 1, "num_stages": 3, "num_warps": 4}
++_Q38_CFG_SK8 = {"BLOCK_SIZE_M": 32, "BLOCK_SIZE_N": 16, "BLOCK_SIZE_K": 128,
++                "GROUP_SIZE_M": 4, "SPLIT_K": 8, "num_stages": 2, "num_warps": 4}
++# (K, N) -> [(M_lo, M_hi, cfg)], inclusive M range; unlisted -> None (stock)
++# gate_up=MLP[5120,17408] down=MLP[8704,5120] out_proj=GDN[5120,5120]
++# qkvz=GDN[5120,8192] ba=GDN[5120,48] kv=Full[5120,512] (rank-local at TP2).
++# All entries are measured winners only; M ranges where tuned configs lose
++# (v_proj@M128, q_proj all, small-M down/out_proj) are excluded fail-closed.
++_Q38_INT8_TABLE = [
++    ((5120, 17408), [(1, 32, _Q38_CFG_ST3), (33, 64, _Q38_CFG_ST2), (65, 128, _Q38_CFG_BM64)]),
++    ((8704, 5120), [(33, 96, _Q38_CFG_ST2), (97, 128, _Q38_CFG_BM64)]),
++    ((5120, 5120), [(17, 64, _Q38_CFG_ST2), (65, 128, _Q38_CFG_BM64)]),
++    ((5120, 8192), [(65, 96, _Q38_CFG_ST2), (97, 128, _Q38_CFG_BM64)]),
++    ((5120, 48), [(1, 128, _Q38_CFG_SK8)]),
++    ((5120, 512), [(1, 96, _Q38_CFG_SK8)]),
++    # lm_head (target+draft, rank-local vocab shard; measured in
++    # perf/lmhead_int8_cfg.py 2026-09-22: 1.8-3.6ms heuristic -> 1.0-1.6ms)
++    ((5120, 124160), [(1, 16, _Q38_CFG_BM16ST3), (17, 32, _Q38_CFG_ST3),
++                      (33, 64, _Q38_CFG_ST2), (65, 128, _Q38_CFG_BM64)]),
++]
++_q38_seen: set = set()
++
++
++def _q38_tuned_config(m: int, k: int, n: int):
++    for (kk, nn), buckets in _Q38_INT8_TABLE:
++        if kk == k and nn == n:
++            for m_lo, m_hi, cfg in buckets:
++                if m_lo <= m <= m_hi:
++                    key = (m, k, n)
++                    if key not in _q38_seen:
++                        _q38_seen.add(key)
++                        print(f"[q38 int8-tune] ACTIVE M={m} K={k} N={n} -> {cfg}",
++                              flush=True)
++                    return cfg
++            return None
++    return None
++
+ _is_cuda = is_cuda()
+ _is_hcu = is_hcu()
+ _is_cpu_amx_available = cpu_has_amx_support()
+@@ -270,6 +325,13 @@
+         x_scale_2d = x_scale.view(-1, x_scale.shape[-1])
+         output_shape = [*x_q.shape[:-1], layer.weight.shape[1]]
+ 
++        # [q38-opt 0003] pass measured tuned config when enabled and table hit
++        _q38_best_config = None
++        if _Q38_INT8_TUNE:
++            _q38_best_config = _q38_tuned_config(
++                x_q_2d.shape[0], x_q_2d.shape[1], layer.weight.shape[1]
++            )
++
+         output = quant_ops.triton_scaled_mm(
+             x_q_2d,
+             layer.weight,
+@@ -277,6 +339,7 @@
+             layer.weight_scale,
+             out_dtype=x.dtype,
+             bias=bias,
++            best_config=_q38_best_config,
+         )
+ 
+         return output.view(output_shape)

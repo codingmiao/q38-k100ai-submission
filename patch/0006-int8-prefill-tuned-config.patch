@@ -1,0 +1,69 @@
+--- a/srt/layers/quantization/w8a8_int8.py
++++ b/srt/layers/quantization/w8a8_int8.py
+@@ -80,22 +80,51 @@
+                     "GROUP_SIZE_M": 4, "SPLIT_K": 1, "num_stages": 3, "num_warps": 4}
+ _Q38_CFG_SK8 = {"BLOCK_SIZE_M": 32, "BLOCK_SIZE_N": 16, "BLOCK_SIZE_K": 128,
+                 "GROUP_SIZE_M": 4, "SPLIT_K": 8, "num_stages": 2, "num_warps": 4}
++# [q38-opt 0006] prefill-M (M>=129) tuned configs. The stock lightop table uses
++# num_stages=0 (no software pipelining) for M>128; microbench (perf/bench_prefill_full.py,
++# 2026-09-28, CUDA-graph timed on K100-AI gfx928) shows num_stages=2 wins 1.14-1.99x on
++# the big prefill shapes (compute-bound; the GEMM is the prefill bottleneck). Gated on
++# SGLANG_INT8_PREFILL_TUNE so it can be A/B'd independently of the decode table (0003).
++_Q38_PREFILL_TUNE = _q38_os.getenv("SGLANG_INT8_PREFILL_TUNE", "0") == "1"
++_Q38_CFG_P128 = {"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 128, "BLOCK_SIZE_K": 256,
++                 "GROUP_SIZE_M": 8, "SPLIT_K": 1, "num_stages": 2, "num_warps": 8}
++_Q38_CFG_P128BK64 = {"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 128, "BLOCK_SIZE_K": 64,
++                     "GROUP_SIZE_M": 8, "SPLIT_K": 1, "num_stages": 2, "num_warps": 8}
++_Q38_CFG_P128BK128 = {"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 128, "BLOCK_SIZE_K": 128,
++                      "GROUP_SIZE_M": 8, "SPLIT_K": 1, "num_stages": 2, "num_warps": 8}
++_Q38_CFG_P64BK128 = {"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 128, "BLOCK_SIZE_K": 128,
++                     "GROUP_SIZE_M": 8, "SPLIT_K": 1, "num_stages": 2, "num_warps": 4}
++_Q38_CFG_P256BK64 = {"BLOCK_SIZE_M": 256, "BLOCK_SIZE_N": 128, "BLOCK_SIZE_K": 64,
++                     "GROUP_SIZE_M": 8, "SPLIT_K": 1, "num_stages": 2, "num_warps": 4}
+ # (K, N) -> [(M_lo, M_hi, cfg)], inclusive M range; unlisted -> None (stock)
+ # gate_up=MLP[5120,17408] down=MLP[8704,5120] out_proj=GDN[5120,5120]
+ # qkvz=GDN[5120,8192] ba=GDN[5120,48] kv=Full[5120,512] (rank-local at TP2).
+ # All entries are measured winners only; M ranges where tuned configs lose
+ # (v_proj@M128, q_proj all, small-M down/out_proj) are excluded fail-closed.
+ _Q38_INT8_TABLE = [
+-    ((5120, 17408), [(1, 32, _Q38_CFG_ST3), (33, 64, _Q38_CFG_ST2), (65, 128, _Q38_CFG_BM64)]),
+-    ((8704, 5120), [(33, 96, _Q38_CFG_ST2), (97, 128, _Q38_CFG_BM64)]),
+-    ((5120, 5120), [(17, 64, _Q38_CFG_ST2), (65, 128, _Q38_CFG_BM64)]),
+-    ((5120, 8192), [(65, 96, _Q38_CFG_ST2), (97, 128, _Q38_CFG_BM64)]),
++    ((5120, 17408), [(1, 32, _Q38_CFG_ST3), (33, 64, _Q38_CFG_ST2), (65, 128, _Q38_CFG_BM64),
++                     (129, 4096, _Q38_CFG_P128), (4097, 8192, _Q38_CFG_P128),
++                     (8193, 16384, _Q38_CFG_P64BK128)]),
++    ((8704, 5120), [(33, 96, _Q38_CFG_ST2), (97, 128, _Q38_CFG_BM64),
++                    (129, 4096, _Q38_CFG_P128BK64), (4097, 8192, _Q38_CFG_P128),
++                    (8193, 16384, _Q38_CFG_P128)]),
++    ((5120, 5120), [(17, 64, _Q38_CFG_ST2), (65, 128, _Q38_CFG_BM64),
++                    (129, 16384, _Q38_CFG_P128)]),
++    ((5120, 8192), [(65, 96, _Q38_CFG_ST2), (97, 128, _Q38_CFG_BM64),
++                    (129, 4096, _Q38_CFG_P256BK64), (4097, 8192, _Q38_CFG_P128),
++                    (8193, 16384, _Q38_CFG_P128)]),
+     ((5120, 48), [(1, 128, _Q38_CFG_SK8)]),
+     ((5120, 512), [(1, 96, _Q38_CFG_SK8)]),
+     # lm_head (target+draft, rank-local vocab shard; measured in
+     # perf/lmhead_int8_cfg.py 2026-09-22: 1.8-3.6ms heuristic -> 1.0-1.6ms)
+     ((5120, 124160), [(1, 16, _Q38_CFG_BM16ST3), (17, 32, _Q38_CFG_ST3),
+                       (33, 64, _Q38_CFG_ST2), (65, 128, _Q38_CFG_BM64)]),
++    # [q38-opt 0006] full-attention projections (prefill-M only; decode M<=128 stays
++    # stock for these). Measured winners per (shape, M) from perf/bench_prefill_full.py.
++    ((5120, 3072), [(129, 4096, _Q38_CFG_P128BK64), (4097, 8192, _Q38_CFG_P128BK128),
++                    (8193, 16384, _Q38_CFG_P128)]),
++    ((3072, 5120), [(129, 4096, _Q38_CFG_P128), (4097, 8192, _Q38_CFG_P64BK128),
++                    (8193, 16384, _Q38_CFG_P64BK128)]),
+ ]
+ _q38_seen: set = set()
+ 
+@@ -105,6 +134,10 @@
+         if kk == k and nn == n:
+             for m_lo, m_hi, cfg in buckets:
+                 if m_lo <= m <= m_hi:
++                    # [q38-opt 0006] prefill buckets (M>=129) only active when the
++                    # prefill-tune env is on; decode (M<=128) is never gated.
++                    if m >= 129 and not _Q38_PREFILL_TUNE:
++                        return None
+                     key = (m, k, n)
+                     if key not in _q38_seen:
+                         _q38_seen.add(key)

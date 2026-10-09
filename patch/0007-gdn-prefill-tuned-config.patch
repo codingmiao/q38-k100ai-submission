@@ -1,0 +1,48 @@
+--- a/srt/layers/attention/fla/wy_fast.py
++++ b/srt/layers/attention/fla/wy_fast.py
+@@ -8,6 +8,23 @@
+ import triton
+ import triton.language as tl
+ 
++# [q38-opt 0007] GDN prefill chunked-kernel tuned launch configs.
++# Microbench (perf/bench_gdn_prefill_tp2.py, 2026-09-28, CUDA-event timed on
++# K100-AI gfx928 at REAL TP2 serving shapes H=24/Hg=8) shows the stock
++# recompute_w_u config (BK64/BV64/w4/s3) leaves 1.4-2.2x on the table:
++#   64K (T=16384): 9.055 -> 4.208 ms (2.15x)   4K (T=4096): 0.669 -> 0.470 ms (1.42x)
++# Gated on SGLANG_GDN_TUNE so it can be A/B;ed; fail-closed to stock when off.
++# The other two GDN prefill kernels (chunk_fwd_o, delta_h) are tuned via aiter
++# JSON config files (see /work/patches/gdn_configs/), not code.
++import os
++_Q38_GDN_TUNE = os.getenv("SGLANG_GDN_TUNE", "0") == "1"
++if _Q38_GDN_TUNE:
++    _Q38_GDN_WU_BK, _Q38_GDN_WU_BV = 32, 32
++    _Q38_GDN_WU_WARPS, _Q38_GDN_WU_STAGES = 2, 2
++else:
++    _Q38_GDN_WU_BK, _Q38_GDN_WU_BV = 64, 64
++    _Q38_GDN_WU_WARPS, _Q38_GDN_WU_STAGES = 4, 3
++
+ from sglang.srt.layers.attention.fla.index import prepare_chunk_indices
+ 
+ 
+@@ -124,8 +141,8 @@
+     if chunk_indices is None and cu_seqlens is not None:
+         chunk_indices = prepare_chunk_indices(cu_seqlens, BT)
+     NT = triton.cdiv(T, BT) if cu_seqlens is None else len(chunk_indices)
+-    BK = 64
+-    BV = 64
++    BK = _Q38_GDN_WU_BK
++    BV = _Q38_GDN_WU_BV
+     u = torch.empty_like(v)
+     w = k.new_empty(B, T, H, K)
+     recompute_w_u_fwd_kernel[(NT, B * H)](
+@@ -147,8 +164,8 @@
+         BK=BK,
+         BV=BV,
+         IS_VARLEN=cu_seqlens is not None,
+-        num_warps=4,
+-        num_stages=3,
++        num_warps=_Q38_GDN_WU_WARPS,
++        num_stages=_Q38_GDN_WU_STAGES,
+     )
+     return w, u
+ 

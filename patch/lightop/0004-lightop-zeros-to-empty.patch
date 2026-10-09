@@ -1,0 +1,17 @@
+--- a/_lmslim_native/layers/gemm/int8_utils.py
++++ b/_lmslim_native/layers/gemm/int8_utils.py
+@@ -573,7 +573,13 @@
+         else:
+             config= {'BLOCK_SIZE_M': 256, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K': 64, 'GROUP_SIZE_M': 8,'SPLIT_K': 1,'num_stages':0, 'num_warps':8}
+     if config['SPLIT_K']==1:
+-        c = torch.zeros((M, N), device=a.device, dtype=out_dtype)
++        # [q38-opt 0004] SPLIT_K==1 stores every (m,n) exactly once under
++        # full coverage masks, so zero-init is redundant; skip the memset
++        # when SGLANG_INT8_TUNE=1 (one memset per layer GEMM removed).
++        if os.getenv("SGLANG_INT8_TUNE", "0") == "1":
++            c = torch.empty((M, N), device=a.device, dtype=out_dtype)
++        else:
++            c = torch.zeros((M, N), device=a.device, dtype=out_dtype)
+     else:
+         c = torch.zeros((M, N), device=a.device, dtype=torch.float32)
+ 

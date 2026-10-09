@@ -1,0 +1,13 @@
+{
+  "base_url": "http://127.0.0.1:30011",
+  "concurrency": 32,
+  "input_len": 4096,
+  "measure_rounds": 3,
+  "model": "q38tp2",
+  "output_dir": "/work/sla_mean_rescan/4k_c32",
+  "output_len": 1024,
+  "requests_per_round": 64,
+  "seed": 20260912,
+  "timeout": 3600,
+  "warmup_rounds": 2
+}

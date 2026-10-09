@@ -1,0 +1,13 @@
+{
+  "base_url": "http://127.0.0.1:30011",
+  "concurrency": 1,
+  "input_len": 4096,
+  "measure_rounds": 3,
+  "model": "q38tp2",
+  "output_dir": "/work/bench_official/final_4k_in4096_c1",
+  "output_len": 1024,
+  "requests_per_round": 8,
+  "seed": 20260912,
+  "timeout": 3600,
+  "warmup_rounds": 2
+}
